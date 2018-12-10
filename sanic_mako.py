@@ -116,10 +116,9 @@ class SanicMako:
     def __init__(self, app=None, pkg_path=None, context_processors=(),
                  app_key=APP_KEY):
         self.app = app
-        self.context_processors = context_processors
 
         if app:
-            self.init_app(app, pkg_path)
+            self.init_app(app, pkg_path, context_processors)
 
     def init_app(self, app, pkg_path=None, context_processors=(),
                  app_key=APP_KEY):
@@ -137,12 +136,11 @@ class SanicMako:
 
         kw = {
             'input_encoding': app.config.get('MAKO_INPUT_ENCODING', 'utf-8'),
-            'output_encoding': app.config.get('MAKO_OUTPUT_ENCODING', 'utf-8'),
             'module_directory': app.config.get('MAKO_MODULE_DIRECTORY', None),
             'collection_size': app.config.get('MAKO_COLLECTION_SIZE', -1),
             'imports': app.config.get('MAKO_IMPORTS', []),
             'filesystem_checks': app.config.get('MAKO_FILESYSTEM_CHECKS', True),
-            'default_filters': app.config.get('MAKO_DEFAULT_FILTERS', ['str', 'h']),  # noqa
+            'default_filters': app.config.get('MAKO_DEFAULT_FILTERS', ['trim', 'str', 'h']),  # noqa
             'preprocessor': app.config.get('MAKO_PREPROCESSOR', None),
             'strict_undefined': app.config.get('MAKO_STRICT_UNDEFINED', False),
         }
@@ -155,12 +153,12 @@ class SanicMako:
     def template(template_name, app_key=APP_KEY, status=200):
         def wrapper(func):
             @functools.wraps(func)
-            async def wrapped(*args):
+            async def wrapped(*args, **kwargs):
                 if asyncio.iscoroutinefunction(func):
                     coro = func
                 else:
                     coro = asyncio.coroutine(func)
-                context = await coro(*args)
+                context = await coro(*args, **kwargs)
                 request = args[-1]
                 response = render_template(template_name, request, context,
                                            app_key=app_key)
@@ -192,7 +190,7 @@ def render_string(template_name, request, context, *, app_key):
     if request.get(REQUEST_CONTEXT_KEY):
         context = dict(request[REQUEST_CONTEXT_KEY], **context)
     try:
-        text = template.render(**context)
+        text = template.render(request=request, app=request.app, **context)
 
     except Exception:
         translate = request.app.config.get("MAKO_TRANSLATE_EXCEPTIONS", True)
