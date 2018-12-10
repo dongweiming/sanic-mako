@@ -105,7 +105,7 @@ class TemplateError(RichTraceback, RuntimeError):
         self.einfo = sys.exc_info()
         self.text = text_error_template().render()
         if hasattr(template, 'uri'):
-            msg = "Error occurred while rendering template '{0}'" 
+            msg = "Error occurred while rendering template '{0}'"
             msg = msg.format(template.uri)
         else:
             msg = template.args[0]
@@ -114,7 +114,7 @@ class TemplateError(RichTraceback, RuntimeError):
 
 class SanicMako:
     def __init__(self, app=None, pkg_path=None, context_processors=(),
-                 app_key=APP_KEY, **kwargs):
+                 app_key=APP_KEY):
         self.app = app
         self.context_processors = context_processors
 
@@ -122,7 +122,7 @@ class SanicMako:
             self.init_app(app, pkg_path)
 
     def init_app(self, app, pkg_path=None, context_processors=(),
-                 app_key=APP_KEY, **kwargs):
+                 app_key=APP_KEY):
 
         if pkg_path is not None and os.path.isdir(pkg_path):
             paths = [pkg_path]
@@ -131,21 +131,23 @@ class SanicMako:
 
         self.context_processors = context_processors
 
-        setattr(app, app_key, TemplateLookup(directories=paths, **kwargs))
         if context_processors:
             app[APP_CONTEXT_PROCESSORS_KEY] = context_processors
             app.middlewares.append(context_processors_middleware)
 
-        app.config.setdefault('MAKO_INPUT_ENCODING', 'utf-8')
-        app.config.setdefault('MAKO_OUTPUT_ENCODING', 'utf-8')
-        app.config.setdefault('MAKO_MODULE_DIRECTORY', None)
-        app.config.setdefault('MAKO_COLLECTION_SIZE', -1)
-        app.config.setdefault('MAKO_IMPORTS', None)
-        app.config.setdefault('MAKO_FILESYSTEM_CHECKS', True)
-        app.config.setdefault('MAKO_TRANSLATE_EXCEPTIONS', True)
-        app.config.setdefault('MAKO_DEFAULT_FILTERS', None)
-        app.config.setdefault('MAKO_PREPROCESSOR', None)
-        app.config.setdefault('MAKO_STRICT_UNDEFINED', False)
+        kw = {
+            'input_encoding': app.config.get('MAKO_INPUT_ENCODING', 'utf-8'),
+            'output_encoding': app.config.get('MAKO_OUTPUT_ENCODING', 'utf-8'),
+            'module_directory': app.config.get('MAKO_MODULE_DIRECTORY', None),
+            'collection_size': app.config.get('MAKO_COLLECTION_SIZE', -1),
+            'imports': app.config.get('MAKO_IMPORTS', []),
+            'filesystem_checks': app.config.get('MAKO_FILESYSTEM_CHECKS', True),
+            'default_filters': app.config.get('MAKO_DEFAULT_FILTERS', ['str', 'h']),  # noqa
+            'preprocessor': app.config.get('MAKO_PREPROCESSOR', None),
+            'strict_undefined': app.config.get('MAKO_STRICT_UNDEFINED', False),
+        }
+
+        setattr(app, app_key, TemplateLookup(directories=paths, **kw))
 
         return getattr(app, app_key)
 
@@ -190,11 +192,15 @@ def render_string(template_name, request, context, *, app_key):
     if request.get(REQUEST_CONTEXT_KEY):
         context = dict(request[REQUEST_CONTEXT_KEY], **context)
     try:
-        text = template.render_unicode(**context)
+        text = template.render(**context)
 
     except Exception:
-        template.uri = template_name
-        raise TemplateError(template)
+        translate = request.app.config.get("MAKO_TRANSLATE_EXCEPTIONS", True)
+        if translate:
+            template.uri = template_name
+            raise TemplateError(template)
+        else:
+            raise
 
     return text
 
