@@ -12,9 +12,9 @@ from sanic.exceptions import ServerError
 from mako.exceptions import (
     RichTraceback, TemplateLookupException, text_error_template)
 
-__version__ = '0.1.0'
+__version__ = '0.3.0'
 
-__all__ = ('get_lookup', 'render_template', 'template',
+__all__ = ('get_lookup', 'render_template', 'render_template_def',
            'render_string')
 
 
@@ -37,7 +37,7 @@ def get_root_path(import_name):
     filepath = getattr(mod, '__file__', None)
 
     if filepath is None:
-        raise RuntimeError(f'No root path can be found for the provided '
+        raise RuntimeError('No root path can be found for the provided '
                            'module "{import_name}".  This can happen because the '
                            'module came from an import hook that does '
                            'not provide file name information or because '
@@ -140,7 +140,7 @@ class SanicMako:
             'collection_size': app.config.get('MAKO_COLLECTION_SIZE', -1),
             'imports': app.config.get('MAKO_IMPORTS', []),
             'filesystem_checks': app.config.get('MAKO_FILESYSTEM_CHECKS', True),
-            'default_filters': app.config.get('MAKO_DEFAULT_FILTERS', ['trim', 'str', 'h']),  # noqa
+            'default_filters': app.config.get('MAKO_DEFAULT_FILTERS', ['str', 'h']),  # noqa
             'preprocessor': app.config.get('MAKO_PREPROCESSOR', None),
             'strict_undefined': app.config.get('MAKO_STRICT_UNDEFINED', False),
         }
@@ -191,7 +191,36 @@ def render_string(template_name, request, context, *, app_key):
         context = dict(request[REQUEST_CONTEXT_KEY], **context)
     try:
         text = template.render(request=request, app=request.app, **context)
+    except Exception:
+        translate = request.app.config.get("MAKO_TRANSLATE_EXCEPTIONS", True)
+        if translate:
+            template.uri = template_name
+            raise TemplateError(template)
+        else:
+            raise
 
+    return text
+
+
+def render_template_def(template_name, def_name, request, context, *, app_key=APP_KEY):
+    lookup = get_lookup(request.app, app_key)
+
+    if lookup is None:
+        raise TemplateError(ServerError(
+            f"Template engine is not initialized, "
+            "call sanic_mako.init_app first", status_code=500))
+    try:
+        template = lookup.get_template(template_name)
+    except TemplateLookupException as e:
+        raise TemplateError(ServerError(f"Template '{template_name}' not found",
+                                        status_code=500)) from e
+    if not isinstance(context, Mapping):
+        raise TemplateError(ServerError(
+            "context should be mapping, not {type(context)}", status_code=500))
+    if request.get(REQUEST_CONTEXT_KEY):
+        context = dict(request[REQUEST_CONTEXT_KEY], **context)
+    try:
+        text = template.get_def(def_name).render(app=request.app, **context)
     except Exception:
         translate = request.app.config.get("MAKO_TRANSLATE_EXCEPTIONS", True)
         if translate:
