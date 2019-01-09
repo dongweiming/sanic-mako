@@ -10,7 +10,7 @@ Mako support for sanic
 `sanic-mako` supports:
 
 - `@mako.template` syntax
-- use `render_template_def` render a specific def from a given template 
+- use `render_template_def` render a specific def from a given template
 - use `render_template` render a template from the template folder with the given context
 - factory pattern `init_app` method for creating apps
 
