@@ -5,14 +5,12 @@ import sys
 import pkgutil
 from collections import Mapping
 
-from werkzeug.debug.tbtools import Traceback, Frame, Line
 from sanic.response import HTTPResponse
 from mako.lookup import TemplateLookup
 from sanic.exceptions import ServerError
-from mako.exceptions import (
-    RichTraceback, TemplateLookupException, text_error_template)
+from mako.exceptions import TemplateLookupException, text_error_template
 
-__version__ = '0.3.0'
+__version__ = '0.4.0'
 
 __all__ = ('get_lookup', 'render_template', 'render_template_def',
            'render_string')
@@ -47,58 +45,8 @@ def get_root_path(import_name):
     return os.path.dirname(os.path.abspath(filepath))
 
 
-class MakoFrame(Frame):
-    """ A special `~werkzeug.debug.tbtools.Frame` object for Mako sources. """
-    def __init__(self, exc_type, exc_value, tb, name, line):
-        super(MakoFrame, self).__init__(exc_type, exc_value, tb)
-        self.info = "(translated Mako exception)"
-        self.filename = name
-        self.lineno = line
-        old_locals = self.locals
-        self.locals = dict(tb.tb_frame.f_locals['context'].kwargs)
-        self.locals['__mako_module_locals__'] = old_locals
-
-    def get_annotated_lines(self):
-        lines = [Line(idx + 1, x) for idx, x in enumerate(self.sourcelines)]
-
-        try:
-            lines[self.lineno - 1].current = True
-        except IndexError:
-            pass
-
-        return lines
-
-
-class TemplateError(RichTraceback, RuntimeError):
+class TemplateError(RuntimeError):
     """ A template has thrown an error during rendering. """
-
-    def werkzeug_debug_traceback(self, exc_type, exc_value, tb):
-        """ Munge the default Werkzeug traceback to include Mako info. """
-
-        orig_type, orig_value, orig_tb = self.einfo
-        translated = Traceback(orig_type, orig_value, tb)
-
-        # Drop the "raise" frame from the traceback.
-        translated.frames.pop()
-
-        def orig_frames():
-            cur = orig_tb
-            while cur:
-                yield cur
-                cur = cur.tb_next
-
-        # Append our original frames, overwriting previous source information
-        # with the translated Mako line locators.
-        for tb, record in zip(orig_frames(), self.records):
-            name, line = record[4:6]
-            if name:
-                new_frame = MakoFrame(orig_type, orig_value, tb, name, line)
-            else:
-                new_frame = Frame(orig_type, orig_value, tb)
-
-            translated.frames.append(new_frame)
-
-        return translated
 
     def __init__(self, template):
         super(TemplateError, self).__init__()
@@ -160,8 +108,8 @@ class SanicMako:
                     coro = asyncio.coroutine(func)
                 context = await coro(*args, **kwargs)
                 request = args[-1]
-                response = render_template(template_name, request, context,
-                                           app_key=app_key)
+                response = await render_template(template_name, request, context,
+                                                 app_key=app_key)
                 response.status = status
                 return response
             return wrapped
@@ -172,7 +120,7 @@ def get_lookup(app, app_key=APP_KEY):
     return getattr(app, app_key)
 
 
-def render_string(template_name, request, context, *, app_key):
+async def render_string(template_name, request, context, *, app_key=APP_KEY):
     lookup = get_lookup(request.app, app_key)
 
     if lookup is None:
@@ -202,7 +150,8 @@ def render_string(template_name, request, context, *, app_key):
     return text
 
 
-def render_template_def(template_name, def_name, request, context, *, app_key=APP_KEY):
+async def render_template_def(template_name, def_name, request, context, *,
+                              app_key=APP_KEY):
     lookup = get_lookup(request.app, app_key)
 
     if lookup is None:
@@ -232,9 +181,11 @@ def render_template_def(template_name, def_name, request, context, *, app_key=AP
     return text
 
 
-def render_template(template_name, request, context, *, app_key=APP_KEY):
-    text = render_string(template_name, request, context, app_key=app_key)
-    content_type = 'text/html'
+async def render_template(template_name, request, context, *,
+                          content_type=None, app_key=APP_KEY):
+    text = await render_string(template_name, request, context, app_key=app_key)
+    if content_type is None:
+        content_type = 'text/html'
     return HTTPResponse(text, content_type=content_type)
 
 
@@ -246,7 +197,3 @@ async def context_processors_middleware(app, handler):
                 (await processor(request)))
         return (await handler(request))
     return middleware
-
-
-async def request_processor(request):
-    return {'request': request}
