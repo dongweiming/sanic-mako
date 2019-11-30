@@ -10,7 +10,7 @@ from mako.lookup import TemplateLookup
 from sanic.exceptions import ServerError
 from mako.exceptions import TemplateLookupException, text_error_template
 
-__version__ = '0.4.0'
+__version__ = '0.5.0'
 
 __all__ = ('get_lookup', 'render_template', 'render_template_def',
            'render_string')
@@ -140,7 +140,7 @@ async def render_string(template_name, request, context, *, app_key=APP_KEY):
     try:
         text = template.render(request=request, app=request.app, **context)
     except Exception:
-        translate = request.app.config.get("MAKO_TRANSLATE_EXCEPTIONS", True)
+        translate = request.app.config.get("MAKO_TRANSLATE_EXCEPTIONS", False)
         if translate:
             template.uri = template_name
             raise TemplateError(template)
