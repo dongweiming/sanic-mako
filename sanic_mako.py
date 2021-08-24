@@ -135,7 +135,7 @@ async def render_string(template_name, request, context, *, app_key=APP_KEY):
     if not isinstance(context, Mapping):
         raise TemplateError(ServerError(
             "context should be mapping, not {type(context)}", status_code=500))
-    if request.get(REQUEST_CONTEXT_KEY):
+    if request.ctx.__dict__.get(REQUEST_CONTEXT_KEY):
         context = dict(request[REQUEST_CONTEXT_KEY], **context)
     try:
         text = template.render(request=request, app=request.app, **context)
@@ -166,7 +166,7 @@ async def render_template_def(template_name, def_name, request, context, *,
     if not isinstance(context, Mapping):
         raise TemplateError(ServerError(
             "context should be mapping, not {type(context)}", status_code=500))
-    if request.get(REQUEST_CONTEXT_KEY):
+    if request.ctx.__dict__.get(REQUEST_CONTEXT_KEY):
         context = dict(request[REQUEST_CONTEXT_KEY], **context)
     try:
         text = template.get_def(def_name).render(app=request.app, **context)

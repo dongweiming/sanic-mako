@@ -29,6 +29,7 @@ setup(
     zip_safe=False,
     platforms='any',
     install_requires=['Werkzeug', 'Mako'],
+    long_description_content_type="text/markdown",
     classifiers=[
         'Framework :: AsyncIO',
         'Environment :: Web Environment',
