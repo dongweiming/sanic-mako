@@ -10,7 +10,7 @@ from mako.lookup import TemplateLookup
 from sanic.exceptions import ServerError
 from mako.exceptions import TemplateLookupException, text_error_template
 
-__version__ = '0.5.0'
+__version__ = '0.6.0'
 
 __all__ = ('get_lookup', 'render_template', 'render_template_def',
            'render_string')
