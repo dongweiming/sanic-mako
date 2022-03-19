@@ -3,7 +3,7 @@ import asyncio
 import functools
 import sys
 import pkgutil
-from collections import Mapping
+from collections.abc import Mapping
 
 from sanic.response import HTTPResponse
 from mako.lookup import TemplateLookup
@@ -93,9 +93,9 @@ class SanicMako:
             'strict_undefined': app.config.get('MAKO_STRICT_UNDEFINED', False),
         }
 
-        setattr(app, app_key, TemplateLookup(directories=paths, **kw))
+        setattr(app.ctx, app_key, TemplateLookup(directories=paths, **kw))
 
-        return getattr(app, app_key)
+        return getattr(app.ctx, app_key)
 
     @staticmethod
     def template(template_name, app_key=APP_KEY, status=200):
@@ -117,7 +117,7 @@ class SanicMako:
 
 
 def get_lookup(app, app_key=APP_KEY):
-    return getattr(app, app_key)
+    return getattr(app.ctx, app_key)
 
 
 async def render_string(template_name, request, context, *, app_key=APP_KEY):
